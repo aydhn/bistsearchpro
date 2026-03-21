@@ -1,0 +1,11 @@
+tvdatafeed
+yfinance
+pandas
+numpy
+pandas-ta
+python-telegram-bot>=20.0
+scikit-learn
+schedule
+sqlalchemy
+beautifulsoup4
+statsmodels
