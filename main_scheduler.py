@@ -1,5 +1,4 @@
 import schedule
-import time
 import logging
 import asyncio
 from datetime import datetime
