@@ -41,5 +41,19 @@ class TestRiskManager(unittest.TestCase):
         result = RiskManager.calculate_position_size(10000, 100, 95, 110)
         self.assertEqual(result, 16)
 
+    def test_calculate_kelly_fraction_edge_cases(self):
+        # Edge case: risk_reward_ratio is 0
+        self.assertEqual(RiskManager.calculate_kelly_fraction(win_rate=0.55, risk_reward_ratio=0.0), 0.0)
+
+        # Edge case: risk_reward_ratio is negative
+        self.assertEqual(RiskManager.calculate_kelly_fraction(win_rate=0.55, risk_reward_ratio=-1.0), 0.0)
+
+        # Edge case: resulting half_kelly_pct is negative (e.g., win_rate is low, RRR is low)
+        self.assertEqual(RiskManager.calculate_kelly_fraction(win_rate=0.40, risk_reward_ratio=1.0), 0.0)
+
+    def test_calculate_kelly_fraction_happy_path(self):
+        # Valid path
+        self.assertAlmostEqual(RiskManager.calculate_kelly_fraction(win_rate=0.55, risk_reward_ratio=2.0), 0.1625, places=4)
+
 if __name__ == '__main__':
     unittest.main()
