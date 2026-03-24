@@ -41,7 +41,7 @@ class MainScheduler:
     def run_daily_data_update(self):
         logger.info("Executing daily data update...")
         # Burada tüm universe için veriler çekilip SQLite'a yazılır.
-        pass
+        raise NotImplementedError("Bu özellik henüz implement edilmemiştir.")
 
     def run_hourly_scan(self):
         now = datetime.now()
@@ -54,7 +54,7 @@ class MainScheduler:
 
             logger.info("Executing hourly market scan...")
             # Sinyal tarama işlemleri
-            pass
+            raise NotImplementedError("Bu özellik henüz implement edilmemiştir.")
         else:
             logger.debug("Piyasa kapalı, saat başı tarama atlandı.")
 
@@ -65,14 +65,14 @@ class MainScheduler:
             # Güncel fiyatları al ve trader.check_open_positions'ı tetikle
             # Bu fonksiyon async olduğu için burada event loop üzerinden çalıştırılmalı veya
             # wrapper kullanılmalı. asyncio.create_task vb.
-            pass
+            raise NotImplementedError("Bu özellik henüz implement edilmemiştir.")
 
     def run_daily_summary(self):
         now = datetime.now()
         if now.weekday() < 5:
             logger.info("Executing daily summary...")
             # PnL özeti çıkarıp Telegram'a at.
-            pass
+            raise NotImplementedError("Bu özellik henüz implement edilmemiştir.")
 
     async def run(self):
         """Asenkron olay döngüsü ile çalışacak ana zamanlayıcı."""
