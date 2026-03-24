@@ -1,7 +1,6 @@
 import logging
 from core.state_manager import StateManager
 from telegram.notifier import TelegramNotifier
-import asyncio
 
 logger = logging.getLogger(__name__)
 
