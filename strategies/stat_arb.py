@@ -1,5 +1,4 @@
 import numpy as np
-import pandas as pd
 import statsmodels.api as sm
 from statsmodels.tsa.stattools import adfuller, coint
 from dataclasses import dataclass
