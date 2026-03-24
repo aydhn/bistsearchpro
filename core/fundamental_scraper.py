@@ -50,10 +50,6 @@ class FundamentalScraper:
             pb_ratio = 'N/A'
             market_cap = 'N/A'
 
-            # Find specific elements (Mock selectors)
-            # tr_pe = soup.find('td', text='F/K Oranı')
-            # if tr_pe: pe_ratio = float(tr_pe.find_next_sibling('td').text.replace(',', '.'))
-
             # Since actual scraping is brittle and site-dependent, we'll mock the extraction here for safety,
             # but log the attempt. If scraping fails (AttributeError), we catch it.
 
