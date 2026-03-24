@@ -75,28 +75,44 @@ class DatabaseManager:
 
     def save_bars(self, symbol, timeframe, df):
         """
-        UPSERTs OHLCV dataframe into SQLite.
+        UPSERTs OHLCV dataframe into SQLite using a highly optimized vectorized approach.
         """
-        if df.empty:
+        if df is None or df.empty:
+            return
+
+        # Pre-calculate column indices to avoid repeated string lookups or dictionary creation in the loop.
+        # This approach is significantly faster and more robust than itertuples(name='Pandas')
+        # especially when column names are not valid Python identifiers.
+        cols = [c.lower() for c in df.columns]
+
+        try:
+            idx_open = cols.index('open') + 1 # +1 because Index is at pos 0 in itertuples(name=None)
+            idx_high = cols.index('high') + 1
+            idx_low = cols.index('low') + 1
+            idx_close = cols.index('close') + 1
+            idx_volume = cols.index('volume') + 1
+        except ValueError as e:
+            logger.error(f"Required OHLCV column missing: {e}")
             return
 
         with self.get_connection() as conn:
             cursor = conn.cursor()
 
-            records = []
-            for index, row in df.iterrows():
-                # Extract index as string properly handling timezone
-                dt_str = str(index)
-
-                # Fetch typical columns. Depending on TV/YF, columns might be lowercase or capitalized.
-                # Assuming data_fetcher standardize to lower/upper. Let's use get to be safe.
-                o = row.get('open', row.get('Open'))
-                h = row.get('high', row.get('High'))
-                l = row.get('low', row.get('Low'))
-                c = row.get('close', row.get('Close'))
-                v = row.get('volume', row.get('Volume'))
-
-                records.append((symbol, timeframe, dt_str, o, h, l, c, v))
+            # Use a generator expression with itertuples(name=None) for maximum performance (returns plain tuples)
+            # This avoids the overhead of namedtuple creation and attribute/key lookups.
+            records = (
+                (
+                    symbol,
+                    timeframe,
+                    str(row[0]), # Index
+                    row[idx_open],
+                    row[idx_high],
+                    row[idx_low],
+                    row[idx_close],
+                    row[idx_volume]
+                )
+                for row in df.itertuples(index=True, name=None)
+            )
 
             cursor.executemany("""
                 INSERT OR REPLACE INTO ohlcv
@@ -105,7 +121,7 @@ class DatabaseManager:
             """, records)
 
             conn.commit()
-            logger.debug(f"Saved {len(records)} bars for {symbol} ({timeframe}) to SQLite.")
+            logger.debug(f"Saved {len(df)} bars for {symbol} ({timeframe}) to SQLite.")
 
     def load_bars(self, symbol, timeframe, limit=1000):
         """
