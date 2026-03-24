@@ -11,18 +11,18 @@ class TurkishSentimentAnalyzer:
     """
     def __init__(self):
         # Pozitif kökler
-        self.positive_roots = [
+        self.positive_roots = (
             'kar', 'büyü', 'art', 'temettü', 'yatırım', 'rekor',
             'anlaşma', 'ihale', 'yüksel', 'kazan', 'kâr', 'gelir',
             'güçlü', 'başarı', 'onay'
-        ]
+        )
 
         # Negatif kökler
-        self.negative_roots = [
+        self.negative_roots = (
             'zarar', 'düş', 'azal', 'ceza', 'dava', 'iptal',
             'risk', 'kriz', 'kayıp', 'uyarı', 'gerile', 'daral',
             'satış', 'soruşturma'
-        ]
+        )
 
     def _clean_text(self, text):
         """
@@ -51,18 +51,13 @@ class TurkishSentimentAnalyzer:
 
         for word in words:
             # Pozitif kontrol
-            for p_root in self.positive_roots:
-                if word.startswith(p_root):
-                    score += 1.0
-                    match_count += 1
-                    break # Bir kelime için tek eşleşme yeterli
-
+            if word.startswith(self.positive_roots):
+                score += 1.0
+                match_count += 1
             # Negatif kontrol
-            for n_root in self.negative_roots:
-                if word.startswith(n_root):
-                    score -= 1.0
-                    match_count += 1
-                    break
+            elif word.startswith(self.negative_roots):
+                score -= 1.0
+                match_count += 1
 
         if match_count == 0:
             return 0.0
