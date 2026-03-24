@@ -2,7 +2,6 @@ import logging
 from datetime import datetime
 from data.db_manager import DatabaseManager
 from telegram.notifier import TelegramNotifier
-import asyncio
 
 logger = logging.getLogger(__name__)
 
