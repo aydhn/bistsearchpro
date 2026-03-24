@@ -1,7 +1,5 @@
 from dataclasses import dataclass
 import logging
-from strategies.indicators import IndicatorPipeline
-from strategies.regime_filter import RegimeFilter
 
 logger = logging.getLogger(__name__)
 
