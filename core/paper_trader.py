@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime
 from data.db_manager import DatabaseManager
-from telegram.notifier import TelegramNotifier
+from telegram_bot.notifier import TelegramNotifier
 
 logger = logging.getLogger(__name__)
 
