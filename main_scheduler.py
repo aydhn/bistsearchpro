@@ -40,7 +40,6 @@ class MainScheduler:
     def run_daily_data_update(self):
         logger.info("Executing daily data update...")
         # Burada tüm universe için veriler çekilip SQLite'a yazılır.
-        pass
 
     def run_hourly_scan(self):
         now = datetime.now()
@@ -53,7 +52,6 @@ class MainScheduler:
 
             logger.info("Executing hourly market scan...")
             # Sinyal tarama işlemleri
-            pass
         else:
             logger.debug("Piyasa kapalı, saat başı tarama atlandı.")
 
@@ -73,8 +71,13 @@ class MainScheduler:
         now = datetime.now()
         if now.weekday() < 5:
             logger.info("Executing daily summary...")
-            # PnL özeti çıkarıp Telegram'a at.
-            pass
+            try:
+                balance = self.trader.get_balance()
+                msg = f"📊 *Gün Sonu Özeti*\n\nGüncel Sanal Bakiye: {balance:.2f} TL"
+                loop = asyncio.get_running_loop()
+                loop.create_task(self.notifier.send_system_alert(msg, level="INFO"))
+            except RuntimeError as e:
+                logger.error(f"Event loop bulunamadı, günlük özet atlandı: {e}")
 
     async def run(self):
         """Asenkron olay döngüsü ile çalışacak ana zamanlayıcı."""
