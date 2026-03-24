@@ -1,4 +1,4 @@
-from tvdatafeed import TvDatafeed, Interval
+from tvdatafeed import TvDatafeed
 import logging
 import time
 import pandas as pd
