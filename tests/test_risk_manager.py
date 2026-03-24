@@ -41,5 +41,26 @@ class TestRiskManager(unittest.TestCase):
         result = RiskManager.calculate_position_size(10000, 100, 95, 110)
         self.assertEqual(result, 16)
 
+    def test_calculate_kelly_fraction_invalid_rrr(self):
+        # rrr <= 0 returns 0.0
+        self.assertEqual(RiskManager.calculate_kelly_fraction(0.5, 0.0), 0.0)
+        self.assertEqual(RiskManager.calculate_kelly_fraction(0.5, -1.0), 0.0)
+
+    def test_calculate_kelly_fraction_negative_advantage(self):
+        # win_rate=0.4, rrr=1.0 -> kelly = 0.4 - (0.6/1.0) = -0.2 -> half_kelly=-0.1 -> returns 0.0
+        self.assertEqual(RiskManager.calculate_kelly_fraction(0.4, 1.0), 0.0)
+
+    def test_calculate_kelly_fraction_break_even(self):
+        # win_rate=0.5, rrr=1.0 -> kelly = 0.5 - (0.5/1.0) = 0.0 -> returns 0.0
+        self.assertEqual(RiskManager.calculate_kelly_fraction(0.5, 1.0), 0.0)
+
+    def test_calculate_kelly_fraction_positive_advantage(self):
+        # win_rate=0.6, rrr=1.0 -> kelly = 0.6 - (0.4/1.0) = 0.2 -> half_kelly=0.1
+        self.assertAlmostEqual(RiskManager.calculate_kelly_fraction(0.6, 1.0), 0.1)
+        # win_rate=0.55, rrr=2.0 -> kelly = 0.55 - (0.45/2.0) = 0.325 -> half_kelly=0.1625
+        self.assertAlmostEqual(RiskManager.calculate_kelly_fraction(0.55, 2.0), 0.1625)
+        # win_rate=1.0, rrr=2.0 -> kelly = 1.0 - (0.0/2.0) = 1.0 -> half_kelly=0.5
+        self.assertAlmostEqual(RiskManager.calculate_kelly_fraction(1.0, 2.0), 0.5)
+
 if __name__ == '__main__':
     unittest.main()
