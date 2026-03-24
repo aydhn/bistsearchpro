@@ -63,9 +63,12 @@ class MainScheduler:
         if now.weekday() < 5 and 10 <= now.hour <= 18:
             logger.info("Executing open position check...")
             # Güncel fiyatları al ve trader.check_open_positions'ı tetikle
-            # Bu fonksiyon async olduğu için burada event loop üzerinden çalıştırılmalı veya
-            # wrapper kullanılmalı. asyncio.create_task vb.
-            pass
+            # Şimdilik boş bir sözlük ile tetikleniyor. Veri bağlandığında güncellenecek.
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(self.trader.check_open_positions({}))
+            except RuntimeError as e:
+                logger.error(f"Event loop bulunamadı, pozisyon kontrolü atlandı: {e}")
 
     def run_daily_summary(self):
         now = datetime.now()
