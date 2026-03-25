@@ -3,6 +3,7 @@ import json
 from unittest.mock import patch, mock_open
 from core.state_manager import StateManager
 import os
+import tempfile
 
 class TestStateManager(unittest.TestCase):
     @patch('core.state_manager.os.path.exists')
@@ -39,6 +40,34 @@ class TestStateManager(unittest.TestCase):
         self.assertEqual(state, {})
         mock_logger.assert_called_once()
         self.assertTrue(mock_logger.call_args[0][0].startswith("Error reading state file"))
+
+
+    def test_update_state_success(self):
+        # Create a temporary file with valid JSON
+        temp_file = tempfile.NamedTemporaryFile(mode='w+', delete=False)
+        json.dump({"system_status": "STARTING"}, temp_file)
+        temp_file.close()
+        temp_file_path = temp_file.name
+
+        try:
+            self.state_manager.state_file = temp_file_path
+            result = self.state_manager.update_state("system_status", "RUNNING")
+            self.assertTrue(result)
+
+            # Read back the file to ensure it was updated
+            with open(temp_file_path, 'r') as f:
+                state = json.load(f)
+                self.assertEqual(state["system_status"], "RUNNING")
+                self.assertIn("last_updated", state)
+        finally:
+            os.unlink(temp_file_path)
+
+    @patch('core.state_manager.logger.error')
+    def test_update_state_error(self, mock_logger):
+        self.state_manager.state_file = "/path/does/not/exist/system_state.json"
+        result = self.state_manager.update_state("system_status", "RUNNING")
+        self.assertFalse(result)
+        mock_logger.assert_called_once()
 
 if __name__ == '__main__':
     unittest.main()
