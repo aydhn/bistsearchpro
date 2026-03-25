@@ -1,4 +1,4 @@
-import pandas_ta as ta
+import pandas_ta  # noqa: F401
 import logging
 
 logger = logging.getLogger(__name__)
