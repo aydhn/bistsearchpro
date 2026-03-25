@@ -41,6 +41,47 @@ class TestRiskManager(unittest.TestCase):
         result = RiskManager.calculate_position_size(10000, 100, 95, 110)
         self.assertEqual(result, 16)
 
+
+    def test_calculate_position_size_kelly_negative(self):
+        # win_rate=0.55, entry=100, sl=90, tp=105 -> RRR = 0.5
+        # kelly = 0.55 - (0.45 / 0.5) = 0.55 - 0.9 = -0.35
+        with self.assertLogs('core.risk_manager', level='INFO') as cm:
+            result = RiskManager.calculate_position_size(10000, 100, 90, 105)
+            self.assertEqual(result, 0)
+            self.assertTrue(any("Kelly Kriteri negatif veya sıfır döndü" in output for output in cm.output))
+
+    def test_calculate_position_size_fixed_risk_dominates(self):
+        # balance=10000, entry=10, sl=9, tp=20 -> risk=1, reward=10, RRR=10
+        # max_lot_fixed = floor(10000 * 0.02 / 1) = 200
+        # half_kelly = (0.55 - 0.45/10) / 2 = 0.2525
+        # lot_kelly = floor(10000 * 0.2525 / 10) = 252
+        # final_lot = min(200, 252) = 200
+        result = RiskManager.calculate_position_size(10000, 10, 9, 20)
+        self.assertEqual(result, 200)
+
+    def test_calculate_position_size_kelly_dominates(self):
+        # balance=10000, entry=10, sl=9, tp=11.5 -> risk=1, reward=1.5, RRR=1.5
+        # max_lot_fixed = floor(10000 * 0.02 / 1) = 200
+        # half_kelly = (0.55 - 0.45/1.5) / 2 = (0.55 - 0.3) / 2 = 0.125
+        # lot_kelly = floor(10000 * 0.125 / 10) = 125
+        # final_lot = min(200, 125) = 125
+        result = RiskManager.calculate_position_size(10000, 10, 9, 11.5)
+        self.assertEqual(result, 125)
+
+    @patch('core.risk_manager.config')
+    def test_calculate_position_size_affordable_dominates(self, mock_config):
+        mock_config.MAX_RISK_PER_TRADE = 1.0 # 100% risk per trade allowed
+        # balance=10000, entry=10, sl=9, tp=20 -> risk=1, reward=10, RRR=10
+        # max_lot_fixed = floor(10000 * 1.0 / 1) = 10000
+        # historical_win_rate = 3.0 (unrealistic, but for testing the cap)
+        # kelly = 3.0 - ((1 - 3.0) / 10) = 3.0 - (-2.0 / 10) = 3.2
+        # half_kelly = 1.6
+        # lot_kelly = floor(10000 * 1.6 / 10) = 1600
+        # max_affordable_lot = floor(10000 / 10) = 1000
+        # final_lot = min(10000, 1600, 1000) = 1000
+        result = RiskManager.calculate_position_size(10000, 10, 9, 20, historical_win_rate=3.0)
+        self.assertEqual(result, 1000)
+
     def test_calculate_kelly_fraction_edge_cases(self):
         # Edge case: risk_reward_ratio is 0
         self.assertEqual(RiskManager.calculate_kelly_fraction(win_rate=0.55, risk_reward_ratio=0.0), 0.0)
