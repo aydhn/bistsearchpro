@@ -40,5 +40,29 @@ class TestStateManager(unittest.TestCase):
         mock_logger.assert_called_once()
         self.assertTrue(mock_logger.call_args[0][0].startswith("Error reading state file"))
 
+
+    def test_get_state_corrupted_json_file(self):
+        import tempfile
+        # Create a temporary file with corrupted JSON
+        fd, temp_path = tempfile.mkstemp()
+        try:
+            with os.fdopen(fd, 'w') as f:
+                f.write('{"system_status": "RUNNING", }') # Invalid JSON due to trailing comma
+
+            # Point state manager to the corrupted file
+            self.state_manager.state_file = temp_path
+
+            with patch('core.state_manager.logger.error') as mock_logger:
+                state = self.state_manager.get_state()
+
+                # Assert empty dict is returned
+                self.assertEqual(state, {})
+
+                # Assert logger was called with an error
+                mock_logger.assert_called_once()
+                self.assertTrue(mock_logger.call_args[0][0].startswith("Error reading state file"))
+        finally:
+            os.remove(temp_path)
+
 if __name__ == '__main__':
     unittest.main()
