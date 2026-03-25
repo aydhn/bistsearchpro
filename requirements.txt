@@ -1,4 +1,4 @@
-tvdatafeed
+#tvdatafeed
 yfinance
 pandas
 numpy
@@ -9,3 +9,4 @@ schedule
 sqlalchemy
 beautifulsoup4
 statsmodels
+git+https://github.com/rongardF/tvdatafeed.git
