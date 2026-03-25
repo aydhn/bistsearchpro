@@ -40,7 +40,6 @@ class MainScheduler:
     def run_daily_data_update(self):
         logger.info("Executing daily data update...")
         # Burada tüm universe için veriler çekilip SQLite'a yazılır.
-        pass
 
     def run_hourly_scan(self):
         now = datetime.now()
@@ -53,7 +52,6 @@ class MainScheduler:
 
             logger.info("Executing hourly market scan...")
             # Sinyal tarama işlemleri
-            pass
         else:
             logger.debug("Piyasa kapalı, saat başı tarama atlandı.")
 
@@ -74,7 +72,6 @@ class MainScheduler:
         if now.weekday() < 5:
             logger.info("Executing daily summary...")
             # PnL özeti çıkarıp Telegram'a at.
-            pass
 
     async def run(self):
         """Asenkron olay döngüsü ile çalışacak ana zamanlayıcı."""
