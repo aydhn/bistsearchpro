@@ -5,9 +5,9 @@ import logging
 from config.settings import config
 from core.state_manager import StateManager
 from data.db_manager import DatabaseManager
-from telegram.notifier import TelegramNotifier
+from telegram_bot.notifier import TelegramNotifier
 from core.paper_trader import PaperTrader
-from telegram.bot_commands import TelegramBotManager
+from telegram_bot.bot_commands import TelegramBotManager
 from main_scheduler import MainScheduler
 
 logger = logging.getLogger(__name__)
