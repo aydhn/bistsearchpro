@@ -79,10 +79,12 @@ class TelegramBotManager:
             await update.message.reply_text("📭 Şu an açık pozisyon bulunmuyor.")
             return
 
-        report = "📋 *AÇIK POZİSYONLAR*\n\n"
+        report_lines = ["📋 *AÇIK POZİSYONLAR*\n\n"]
         for p in positions:
             sym, dir_, entry, lot = p
-            report += f"🔹 {sym} | {dir_} | Giriş: {entry:.2f} | Lot: {lot}\n"
+            report_lines.append(f"🔹 {sym} | {dir_} | Giriş: {entry:.2f} | Lot: {lot}\n")
+
+        report = "".join(report_lines)
 
         await update.message.reply_text(report, parse_mode='Markdown')
 
