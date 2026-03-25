@@ -2,7 +2,6 @@ import gc
 import functools
 import logging
 import inspect
-import pandas as pd
 
 logger = logging.getLogger(__name__)
 
