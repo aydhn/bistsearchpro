@@ -79,6 +79,7 @@ class MainScheduler:
     async def run(self):
         """Asenkron olay döngüsü ile çalışacak ana zamanlayıcı."""
         logger.info("MainScheduler loop started.")
+        loop = asyncio.get_running_loop()
         while True:
-            schedule.run_pending()
+            await loop.run_in_executor(None, schedule.run_pending)
             await asyncio.sleep(1) # CPU'yu yormamak için uyuma
