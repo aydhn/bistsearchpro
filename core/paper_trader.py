@@ -94,6 +94,9 @@ class PaperTrader:
         Saat başı veya belirli periyotlarda çağrılarak SL/TP kontrolü yapar.
         """
         closed_trades = []
+        ids_to_delete = []
+        total_revenue = 0.0
+
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM open_positions")
@@ -126,30 +129,35 @@ class PaperTrader:
                         reason = "TAKE PROFIT"
 
                 if close_price is not None:
-                    # Pozisyonu kapat
-                    cursor.execute("DELETE FROM open_positions WHERE id = ?", (pos_id,))
-
                     # PnL Hesaplama (Çift Yönlü düşünülmüş)
                     if direction.upper() == "BUY":
                         pnl = (close_price - entry_price) * lot_size
                     else:
                         pnl = (entry_price - close_price) * lot_size
 
-                    # Ana parayı ve karı/zararı cüzdana geri ekle
+                    # Ana parayı ve karı/zararı hesapla
                     revenue = (entry_price * lot_size) + pnl
-                    new_bal = self.update_balance(revenue, add=True)
+
+                    ids_to_delete.append((pos_id,))
+                    total_revenue += revenue
 
                     msg = f"📉 *POZİSYON KAPANDI* 📈\n\n" \
                           f"Sembol: {symbol}\n" \
                           f"Sebep: {reason}\n" \
                           f"Giriş: {entry_price:.2f}\n" \
                           f"Çıkış: {close_price:.2f}\n" \
-                          f"Kâr/Zarar: {pnl:.2f} TL\n" \
-                          f"Yeni Bakiye: {new_bal:.2f} TL"
+                          f"Kâr/Zarar: {pnl:.2f} TL"
 
                     closed_trades.append(msg)
 
+            if ids_to_delete:
+                cursor.executemany("DELETE FROM open_positions WHERE id = ?", ids_to_delete)
             conn.commit()
+
+        if ids_to_delete:
+            new_bal = self.update_balance(total_revenue, add=True)
+            # Update the messages with the new balance
+            closed_trades = [msg + f"\nYeni Bakiye: {new_bal:.2f} TL" for msg in closed_trades]
 
         # Telegram bildirimleri
         for msg in closed_trades:
