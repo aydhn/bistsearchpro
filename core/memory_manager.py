@@ -46,9 +46,3 @@ def optimize_memory(func):
 # bağlantıların açık kalmasını önlemek için bir session nesnesi kullanılması
 # veya `with requests.get(...) as response:` yapısı önerilir.
 
-# Gelişmiş Kullanım (DataFrame silme direktifi):
-# Veri işleme veya backtest fonksiyonlarının sonunda (return öncesi) veya except bloğunda:
-# if 'df' in locals() and isinstance(df, pd.DataFrame):
-#      del df
-# gc.collect()
-# satırlarının koda manuel eklenmesi asıl memory sızıntısını önler.
