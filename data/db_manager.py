@@ -2,7 +2,6 @@ import sqlite3
 import pandas as pd
 from config.settings import config
 import logging
-import os
 
 logger = logging.getLogger(__name__)
 
