@@ -1,137 +1,114 @@
+import logging
 import pandas as pd
 import numpy as np
-import logging
 
 logger = logging.getLogger(__name__)
 
-class VectorizedBacktester:
+class BacktestEngine:
     """
-    Saf NumPy/Pandas vektörel backtest motoru.
-    İşlem simülasyonunu komisyon, slippage ve risksiz getiri (Sharpe) ile gerçekçi yapar.
+    Geçmiş verilere dayalı "Vectorized Backtest" motoru.
+    Gereksiz döngülerden kaçınarak pandas'ın gücünü kullanır.
+    Komisyon oranını (0.04% BİST) dahil eder. Ortalama bir bilgisayarda saniyeler içinde binlerce işlem yapabilir.
     """
+    def __init__(self, initial_capital=100000.0, commission_rate=0.0004):
+        self.initial_capital = initial_capital
+        self.commission_rate = commission_rate
 
-    @staticmethod
-    def run_backtest(df_ind, signal_condition, sl_pct=0.02, tp_pct=0.03):
+    def simulate(self, symbol: str, df: pd.DataFrame, signals_series: pd.Series):
         """
-        Gelen indikatörlü DataFrame'e ve bool tipindeki signal_condition Serisine
-        göre vektörel backtest çalıştırır.
+        Signals series, df ile aynı uzunlukta, "AL" (1), "SAT" (-1), ve "YATAY" (0) sinyalleri içerir.
         """
-        if df_ind is None or df_ind.empty or signal_condition.sum() == 0:
-            logger.warning("Backtest için yeterli sinyal veya veri yok.")
-            return None
+        if df.empty or signals_series.empty:
+            logger.warning("Backtest için yeterli veri yok.")
+            return {}
 
-        # Gerçekçilik Parametreleri
-        COMMISSION_RATE = 0.0025 # Binde 2.5 (Giriş ve Çıkış için toplam işlem maliyeti tahmini)
-        SLIPPAGE_RATE = 0.0015   # Binde 1.5 (%0.15)
-        RISK_FREE_RATE = 0.35    # Yıllık %35 risksiz getiri oranı (Türkiye için varsayılan)
+        try:
+            # İşlem sinyallerini veri tablosuna taşı
+            df_backtest = df.copy()
+            df_backtest['signal'] = signals_series
 
-        df_ind = df_ind.copy()
+            # Basit bir "sürekli piyasada olma" (Always in the market) pozisyon yaklaşımı
+            # Veya sadece sinyal geldiğinde AL/SAT (örneğin sadece long pozisyonları takip eden bir yaklaşım)
+            # Long pozisyon için, bir önceki sinyal '1' ise pozisyon '1'dir (aktif).
+            df_backtest['position'] = df_backtest['signal'].replace(to_replace=0, method='ffill')
 
-        # Sinyalin geldiği günün bir sonraki açılışında (Open) işleme girilir (Look-ahead bias önleme)
-        df_ind['signal'] = signal_condition
-        df_ind['entry_signal'] = df_ind['signal'].shift(1).fillna(False)
+            # Sadece Long işlemler yapıldığını varsayarsak, negatif pozisyonları 0 yap
+            df_backtest['position'] = df_backtest['position'].apply(lambda x: 1 if x == 1 else 0)
 
-        # Giriş Fiyatlarına Slippage Ekleme (Daha pahalıya alma simülasyonu)
-        df_ind['raw_entry'] = np.where(df_ind['entry_signal'], df_ind['open'], np.nan)
-        df_ind['entry_price'] = df_ind['raw_entry'] * (1 + SLIPPAGE_RATE)
+            # Günlük Logaritmik veya Yüzdesel Getiri
+            df_backtest['daily_return'] = df_backtest['close'].pct_change()
 
-        # Stop-Loss ve Take-Profit Seviyeleri (Ham giriş üzerinden, ancak slippage ile vurma ihtimali)
-        df_ind['stop_loss'] = np.where(df_ind['entry_signal'], df_ind['raw_entry'] * (1 - sl_pct), np.nan)
-        df_ind['take_profit'] = np.where(df_ind['entry_signal'], df_ind['raw_entry'] * (1 + tp_pct), np.nan)
+            # Strateji Getirisi = Günlük Getiri * Dünün Pozisyonu (pozisyon gece tutulduysa)
+            df_backtest['strategy_return'] = df_backtest['daily_return'] * df_backtest['position'].shift(1)
 
-        df_ind['active_sl'] = df_ind['stop_loss'].ffill()
-        df_ind['active_tp'] = df_ind['take_profit'].ffill()
+            # Komisyon maliyeti hesaplama (sadece pozisyon değiştiğinde)
+            # Eğer dünün pozisyonu ile bugünün pozisyonu farklıysa işlem olmuştur.
+            df_backtest['trade'] = df_backtest['position'].diff().abs()
+            df_backtest['strategy_return'] = df_backtest['strategy_return'] - (df_backtest['trade'] * self.commission_rate)
 
-        hit_sl = df_ind['low'] <= df_ind['active_sl']
-        hit_tp = df_ind['high'] >= df_ind['active_tp']
+            # Nan'ları doldur
+            df_backtest.fillna(0, inplace=True)
 
-        df_ind['exit_signal'] = hit_sl | hit_tp
+            # Kümülatif Getiri
+            df_backtest['cumulative_strategy'] = (1 + df_backtest['strategy_return']).cumprod()
+            df_backtest['cumulative_market'] = (1 + df_backtest['daily_return']).cumprod()
 
-        # Çıkış Fiyatlarına Slippage Ekleme (Daha ucuza satma simülasyonu)
-        # Eğer SL vurursa, fiyat SL'den daha aşağıda gerçekleşmiş olabilir (olumsuz kayma)
-        df_ind['exit_price_sl'] = df_ind['active_sl'] * (1 - SLIPPAGE_RATE)
-        # Eğer TP vurursa, TP'de satılır (burada slippage pozitif de olabilir ama biz konservatif olup kaydırmayalım veya negatif kaydıralım)
-        df_ind['exit_price_tp'] = df_ind['active_tp'] * (1 - SLIPPAGE_RATE)
+            # Metrik Hesaplamaları
+            final_capital = self.initial_capital * df_backtest['cumulative_strategy'].iloc[-1]
+            total_trades = int(df_backtest['trade'].sum())
 
-        df_ind['exit_price'] = np.where(hit_sl, df_ind['exit_price_sl'],
-                               np.where(hit_tp, df_ind['exit_price_tp'], np.nan))
+            # Kazanan işlemler yüzdesi
+            # Her bir pozisyon kapatıldığındaki net kâr/zarara bakmak vektörel olarak biraz dolaylıdır.
+            # Şimdilik sadece pozitif günlük getirileri kazanç olarak varsayıyoruz.
+            winning_days = len(df_backtest[(df_backtest['strategy_return'] > 0) & (df_backtest['position'].shift(1) > 0)])
+            losing_days = len(df_backtest[(df_backtest['strategy_return'] < 0) & (df_backtest['position'].shift(1) > 0)])
 
-        entries = df_ind[df_ind['entry_signal']].index
+            win_rate = 0.0
+            total_active_days = winning_days + losing_days
+            if total_active_days > 0:
+                win_rate = (winning_days / total_active_days) * 100
 
-        trades = []
-        for entry_idx in entries:
-            future_exits = df_ind.loc[entry_idx:][df_ind.loc[entry_idx:, 'exit_signal']]
-            if not future_exits.empty:
-                exit_idx = future_exits.index[0]
-                exit_price = future_exits.iloc[0]['exit_price']
-                entry_price = df_ind.loc[entry_idx, 'entry_price']
+            # Profit Factor
+            gross_profit = df_backtest[df_backtest['strategy_return'] > 0]['strategy_return'].sum()
+            gross_loss = abs(df_backtest[df_backtest['strategy_return'] < 0]['strategy_return'].sum())
+            profit_factor = gross_profit / gross_loss if gross_loss > 0 else float('inf')
 
-                # Getiri oranı hesaplama ve Komisyon Düşümü
-                # Net Getiri = (Çıkış - Giriş) / Giriş - Komisyon (Çift yönlü düşünülürse 2x komisyon, ama biz toplam komisyon rate belirledik)
-                gross_ret = (exit_price - entry_price) / entry_price
-                net_ret = gross_ret - COMMISSION_RATE
+            # Maximum Drawdown (Maksimum Düşüş)
+            rolling_max = df_backtest['cumulative_strategy'].cummax()
+            drawdown = (df_backtest['cumulative_strategy'] - rolling_max) / rolling_max
+            max_drawdown = drawdown.min() * 100  # Yüzde olarak
 
-                trades.append({
-                    'entry_time': entry_idx,
-                    'exit_time': exit_idx,
-                    'entry_price': entry_price,
-                    'exit_price': exit_price,
-                    'return_pct': net_ret,
-                    'win': net_ret > 0
-                })
+            logger.info(f"Backtest Tamamlandı: {symbol}")
+            logger.info(f"Başlangıç: {self.initial_capital:.2f} TL, Bitiş: {final_capital:.2f} TL")
+            logger.info(f"İşlem Sayısı: {total_trades}, Win Rate: %{win_rate:.2f}, Profit Factor: {profit_factor:.2f}")
 
-        if not trades:
             return {
-                'total_trades': 0,
-                'win_rate': 0.0,
-                'cumulative_return_pct': 0.0,
-                'max_drawdown_pct': 0.0,
-                'sharpe_ratio': 0.0,
-                'warning': "Sinyal üretilmedi."
+                "symbol": symbol,
+                "initial_capital": self.initial_capital,
+                "final_capital": final_capital,
+                "total_trades": total_trades,
+                "win_rate": win_rate,
+                "profit_factor": profit_factor,
+                "max_drawdown_pct": max_drawdown
             }
 
-        trades_df = pd.DataFrame(trades)
+        except Exception as e:
+            logger.error(f"Backtest hesaplaması sırasında hata oluştu: {str(e)}")
+            return {}
 
-        total_trades = len(trades_df)
-        win_rate = trades_df['win'].mean()
+    # OOS ve Overfitting Dokümantasyonu (Phase 4, Adım 3 uyarınca)
+    """
+    [QUANT MİMARI NOTU - İSTATİSTİKSEL SAĞLAMLIK VE OVERFITTING]
+    Bir stratejinin parametrelerini (örneğin EMA(20) veya RSI(30)) tamamen geçmiş
+    verilere uydurarak (Curve Fitting / Overfitting) test etmek, gerçek piyasa
+    koşullarında hezimete yol açar. Bill Benter'ın istatistiksel sağlamlık
+    felsefesi gereği, geliştirilen sistemlerin geçmiş veri seti ikiye bölünmelidir:
 
-        trades_df['cum_return'] = (1 + trades_df['return_pct']).cumprod()
-        cumulative_return = trades_df['cum_return'].iloc[-1] - 1.0
+    1. In-Sample (Eğitim Verisi): Stratejinin test edilip parametrelerin bulunduğu periyot.
+    2. Out-of-Sample (OOS / Test Verisi): Sistem modelinin "ilk kez karşılaştığı",
+       daha önce optimize edilmemiş saf test periyodu.
 
-        trades_df['peak'] = trades_df['cum_return'].cummax()
-        trades_df['drawdown'] = (trades_df['cum_return'] - trades_df['peak']) / trades_df['peak']
-        max_drawdown = trades_df['drawdown'].min()
-
-        # Sharpe Oranı Hesaplama (Yıllıklandırılmış)
-        # Günlük getiri verisi olmadığı için trade başına getirilerin standart sapmasını alıyoruz.
-        # Bu basitleştirilmiş bir Sharpe oranıdır (İşlem bazlı).
-        # Risksiz getiri oranını işlem süresine göre ölçeklendirmek gerekir,
-        # ancak basitlik adına yıllık risksiz getiriyi işlem sayısına bölüyoruz (varsayılan 252 işlem günü).
-
-        avg_trade_return = trades_df['return_pct'].mean()
-        std_trade_return = trades_df['return_pct'].std()
-
-        sharpe_ratio = 0.0
-        warning_msg = None
-
-        if std_trade_return > 0:
-            # Günlük risksiz getiri eşdeğeri
-            daily_rf = RISK_FREE_RATE / 252.0
-            # Sharpe = (Ortalama Getiri - Risksiz Getiri) / Getiri Standart Sapması
-            # Yıllıklandırmak için sqrt(252) ile çarpıyoruz
-            sharpe_ratio = ((avg_trade_return - daily_rf) / std_trade_return) * np.sqrt(252)
-
-            if sharpe_ratio < 1.0:
-                warning_msg = "Strateji Yetersiz (Sharpe < 1.0)"
-
-        results = {
-            'total_trades': total_trades,
-            'win_rate': round(win_rate * 100, 2),
-            'cumulative_return_pct': round(cumulative_return * 100, 2),
-            'max_drawdown_pct': round(max_drawdown * 100, 2),
-            'sharpe_ratio': round(sharpe_ratio, 2),
-            'warning': warning_msg
-        }
-
-        logger.info(f"Gerçekçi Backtest Tamamlandı: {results}")
-        return results
+    OOS (Out-of-Sample) testinde başarı gösteremeyen stratejiler piyasada çökmeye mahkumdur.
+    Bu yüzden gerçek sistemler her zaman Walk-Forward Analysis (Geleceğe Dönük Optimizasyon)
+    ve OOS onayları ile kullanılmalıdır.
+    """

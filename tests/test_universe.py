@@ -1,20 +1,14 @@
-import pytest
+import unittest
+from unittest.mock import MagicMock
 from core.universe import SymbolUniverse
 
-def test_map_symbol_tv():
-    universe = SymbolUniverse()
-    assert universe.map_symbol("THYAO", source="tv") == "BIST:THYAO"
-    assert universe.map_symbol("GARAN", source="TV") == "BIST:GARAN"
-    assert universe.map_symbol("ASELS", source="tV") == "BIST:ASELS"
+class TestUniverse(unittest.TestCase):
+    def test_base_symbols(self):
+        mock_fetcher = MagicMock()
+        mock_db = MagicMock()
+        universe = SymbolUniverse(mock_fetcher, mock_db)
 
-def test_map_symbol_yf():
-    universe = SymbolUniverse()
-    assert universe.map_symbol("THYAO", source="yf") == "THYAO.IS"
-    assert universe.map_symbol("GARAN", source="YF") == "GARAN.IS"
-    assert universe.map_symbol("ASELS", source="Yf") == "ASELS.IS"
+        self.assertIn("THYAO", universe.base_symbols)
 
-def test_map_symbol_other():
-    universe = SymbolUniverse()
-    assert universe.map_symbol("THYAO", source="other") == "THYAO"
-    assert universe.map_symbol("GARAN", source="unknown") == "GARAN"
-    assert universe.map_symbol("ASELS", source="") == "ASELS"
+if __name__ == '__main__':
+    unittest.main()

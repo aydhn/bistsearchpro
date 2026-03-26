@@ -1,77 +1,132 @@
-# BIST Algorithmic Trading Bot (bistsearchpro)
+# 📈 BIST Quant Alpha - Kurumsal Sinyal ve Risk Yönetim Mimarisi
 
-Bu proje, Borsa İstanbul (BİST) için geliştirilmiş, **sıfır bütçeli**, **düşük frekanslı**, **çoklu-ajanlı (multi-agent)** bir algoritmik trading botudur. Proje, Python ile yazılmış olup, teknik ve temel analizleri otomatikleştirerek asenkron bir Telegram botu aracılığıyla sinyal ve portföy yönetimi sunar.
+BIST Quant Alpha, Borsa İstanbul (BİST) için geliştirilmiş, yüksek frekanslı ticaret (HFT) **olmayan**, aksine "High Win-Rate" odaklı, tamamen **Sıfır Bütçe** ve yerel kaynaklarla çalışan devasa bir algoritmik sinyal ve portföy yönetim ekosistemidir.
 
-## Temel Tasarım Felsefesi ve Kısıtlamalar
+Sistem, yapay zeka (Makine Öğrenimi), makro veri analizleri, istatistiksel sapma filtreleri ve çoklu zaman dilimi onaylarıyla harmanlanmış profesyonel bir "Python Dosya Ordusu" mimarisine sahiptir. Piyasada kendi kendine karar verebilir, gelişmiş risk yönetimi uygular ve tüm süreçleri asenkron Telegram botu üzerinden bir fon yöneticisi titizliğiyle raporlar.
 
-Bu sistem, katı mimari kurallar ve optimizasyon prensipleri etrafında şekillenmiştir:
-*   **Sıfır Bütçe & Ücretsiz Araçlar:** Hiçbir ücretli API veya veri akışı kullanılmaz. Sadece `tvdatafeed`, `yfinance` gibi ücretsiz, açık kaynaklı kütüphaneler ve yerel veritabanı çözümleri (SQLite) kullanılır.
-*   **Arayüz Yok (No GUI):** Projede web arayüzü veya masaüstü kontrol paneli bulunmaz. Kullanıcı ile olan tek ve ana etkileşim noktası, `python-telegram-bot` kütüphanesi üzerine kurulu asenkron **Telegram Botu**dur.
-*   **Python File Army Mimarisi:** Sistem tek bir monolitik yapıdan ziyade, birbirinden izole edilmiş scriptler ordusu (data fetchers, routers, brain, vb.) şeklinde tasarlanmıştır. Bu bileşenler asenkron olarak çalışır ve yerel SQLite (`UPSERT` mantığıyla) ile JSON state dosyaları üzerinden haberleşir.
-*   **Performans & Optimizasyon:** Veri işleme, teknik indikatör hesaplamaları ve backtest süreçlerinde saf Python döngüleri (`for`/`while`) veya `iterrows()` kullanmak **kesinlikle yasaktır**. Tüm işlemler `pandas-ta`, `numpy.where` ve `pandas.shift` gibi kütüphanelerle **vektörel** olarak gerçekleştirilir. Hafıza yönetimi açısından işlem bitiminde `del df` ve `gc.collect()` çağrılarak bellek optimize edilir.
-*   **Hafif Doğal Dil İşleme (NLP):** Türkçe haber/duyarlılık (sentiment) analizi için BERT gibi ağır yapay zeka modelleri yerine, sistem kaynaklarını tüketmeyen hafif, kural tabanlı sözlük (dictionary) yaklaşımları tercih edilmiştir.
-*   **Nesne Yönelimli ve Güvenli Kod:** Proje sıkı OOP kurallarına, detaylı `try/except` bloklarına ve `logging` standartlarına bağlıdır.
+---
 
-## Mimari ve Klasör Yapısı
+## 📂 Mimari Klasör Ağacı (Directory Tree)
 
-Sistem aşağıdaki izole edilmiş klasör yapısını gerektirir:
+Sistemimiz 21 fazlık modüler bir yapıda, Clean Code ve SOLID prensiplerine göre inşa edilmiştir:
 
-*   `/config`: Proje ayarları, risk parametreleri ve evrensel sabitlerin (`settings.py`) bulunduğu dizin.
-*   `/core`: Ana sistemin kalbi; veri çekiciler (`data_fetcher_tv.py`, `data_fetcher_yf.py`), sinyal işleme (`brain.py`), veritabanı yönlendirici (`data_router.py`), sanal portföy yönetimi (`paper_trader.py`) ve risk/hafıza yöneticileri.
-*   `/data`: Yerel veritabanı (`db_manager.py`) ve market verilerinin saklandığı dizin.
-*   `/logs`: Sistemin sağlık durumu ve hata kayıtlarının tutulduğu dizin.
-*   `/strategies`: Farklı algoritmaların bulunduğu modüller. Örn: `signal_trend.py`, `stat_arb.py`, `macro_filter.py`, `sentiment.py`, `regime_filter.py`, `indicators.py`.
-*   `/telegram`: Kullanıcı ile etkileşim, komut yönetimi (`bot_commands.py`) ve asenkron bildirim katmanı (`notifier.py`).
-*   `/backtest`: Geçmiş veriler üzerinde vektörel testlerin yapıldığı modül (`engine.py`).
+```text
+├── core/
+│   ├── alpha_orchestrator.py    # Çoklu strateji ağırlıklarını belirler (Capital Rotation)
+│   ├── correlation_engine.py    # Sektörel riskleri önleyen Pearson Korelasyon Matrisi
+│   ├── data_fetcher_yf.py       # yfinance tabanlı, rate-limit korumalı ana veri çekici
+│   ├── edge_case_handler.py     # Tavan/Taban ve hacim anomalisi engelleyici (BİST Filtresi)
+│   ├── error_manager.py         # Graceful Degradation ve Exponential Backoff hata yöneticisi
+│   ├── journal_learner.py       # Random Forest tabanlı makine öğrenimi eğitim motoru
+│   ├── logger.py                # RotatingFileHandler kullanan profesyonel sistem kayıtçısı
+│   ├── macro_data.py            # VIX, USDTRY ve Hurst Exponent gibi makro verileri çeker
+│   ├── ml_predictor.py          # %55 Kâr İhtimali (Probability of Success) onayı veren ML filtresi
+│   ├── mtf_engine.py            # "Büyük dalgaya sörf yapılmaz" - Çoklu Zaman Dilimi Onaylayıcısı
+│   ├── paper_trader.py          # Sanal portföy PnL takipçisi ve pozisyon yöneticisi
+│   ├── parameter_optimizer.py   # Calmar Rasyosu hedefli Randomized Search hiperparametre motoru
+│   ├── portfolio_allocator.py   # Aynı anda %80+ korele işlemleri önleyen Portföy Yöneticisi
+│   ├── position_sizer.py        # Kısmi Kelly (Half-Kelly) tabanlı dinamik lot hesaplayıcı
+│   ├── risk_manager.py          # ATR tabanlı Trailing Stop, Breakeven ve Time-Stop yöneticisi
+│   ├── state_recovery.py        # Crash Recovery: Elektrik kesintilerinde AÇIK işlemleri geri yükler
+│   ├── trade_journal.py         # Tüm kararların SQLite DB'ye hukuki izlenebilirlikle kaydedilmesi
+│   └── universe.py              # ADV İlk 40 hissesini seçen, zombi/gap tahtaları eleyen modül
+│
+├── strategies/
+│   ├── cointegration_engine.py  # Engle-Granger testiyle eşbütünleşik hisse çiftleri arar
+│   ├── indicators.py            # pandas-ta tabanlı hızlı vektörel indikatör kütüphanesi
+│   ├── pairs_strategy.py        # Z-Skoru ile çalışan Göreceli Değer (Long-Only Stat Arb)
+│   ├── regime_filter.py         # XU100 SMA200 tabanlı Boğa/Ayı (Market Regime) filtresi
+│   └── strategy_factory.py      # Mean Reversion, Trend Following ve Volatility Breakout fabrikası
+│
+├── backtest/
+│   ├── advanced_backtester.py   # Row-by-Row Tick simülasyonlu, olay yönlendirmeli backtest
+│   ├── engine.py                # Vektörel hızlı backtest motoru
+│   ├── execution_simulator.py   # Dinamik Slippage (Kayma) ve %0.04 Komisyon Simülasyonu
+│   └── monte_carlo.py           # 10.000 Evrenli Monte Carlo İflas Olasılığı (Probability of Ruin) Testi
+│
+├── telegram_bot/
+│   ├── bot_commands.py          # Uzaktan Komuta (/durum, /rapor, /durdur, /baslat) dinleyicisi
+│   └── notifier.py              # Asenkron Telegram bildirim (Signal ve Alert) motoru
+│
+├── data/
+│   ├── db_manager.py            # SQLite Veritabanı Connection Pooling ve Table Setup
+│   └── models/                  # Eğitilmiş .pkl Yapay Zeka modellerinin kaydedildiği klasör
+│
+├── dashboard.py                 # Streamlit tabanlı, read-only Görsel Komuta Merkezi (GUI)
+├── main_scheduler.py            # Zamanlanmış görevlerin (schedule) yürütüldüğü tetikleyici
+├── run_bot.py                   # Asyncio ile Telegram ve Scheduler'ı paralel başlatan ana script
+├── start_bot.bat                # Windows için tek tıkla Bot + Dashboard başlatıcı
+└── requirements.txt             # Sistem bağımlılıkları listesi
+```
 
-Tüm bileşenler, zamanlayıcı (`main_scheduler.py`) ve ana tetikleyici (`run_bot.py`) tarafından orkestre edilir.
+---
 
-## Kurulum ve Kullanım Kılavuzu
+## ⚙️ Kurulum ve Başlatma (Prerequisites & Installation)
 
-Projenin çalıştırılabilmesi için sistemde **Python 3.10+** yüklü olması önerilir.
+**Sistem Gereksinimleri:**
+- Python 3.10 veya üzeri
+- Ortalama bir İşlemci (CPU) ve kablolu internet
+- Borsa İstanbul (BİST) işlem saatlerinde bilgisayarın açık kalması önerilir
 
-### 1. Bağımlılıkların Yüklenmesi
-Terminal veya komut satırını açarak proje dizinine gidin ve gerekli kütüphaneleri yükleyin:
+### 1. Ortamın Hazırlanması
+Projeyi indirdikten sonra terminal üzerinden proje kök dizinine gidin ve gerekli kütüphaneleri yükleyin:
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Ortam Değişkenlerinin Ayarlanması
-Botun sizinle iletişim kurabilmesi için bir Telegram Botu oluşturmalı (BotFather üzerinden) ve kendi kullanıcı ID'nizi belirlemelisiniz.
-
-Aşağıdaki komutları işletim sisteminize göre terminalinize girin:
+### 2. Çevresel Değişkenler (Environment Variables)
+Botun size mesaj atabilmesi ve sizin dışınızdaki kullanıcıları reddetmesi için `TELEGRAM_TOKEN` ve `CHAT_ID` ayarlanmalıdır. BotFather üzerinden botunuzu oluşturup tokenınızı alın.
 
 **Linux / macOS:**
 ```bash
-export TELEGRAM_TOKEN='botfather_dan_aldiginiz_token'
-export CHAT_ID='sizin_telegram_id_niz'
+export TELEGRAM_TOKEN='BOT_TOKENINIZ'
+export CHAT_ID='TELEGRAM_ID_NIZ'
 ```
 
 **Windows (PowerShell):**
 ```powershell
-$env:TELEGRAM_TOKEN='botfather_dan_aldiginiz_token'
-$env:CHAT_ID='sizin_telegram_id_niz'
+$env:TELEGRAM_TOKEN='BOT_TOKENINIZ'
+$env:CHAT_ID='TELEGRAM_ID_NIZ'
 ```
-*(Alternatif olarak bu değerleri .env dosyasına veya doğrudan sistem ortam değişkenlerine kalıcı olarak da ekleyebilirsiniz.)*
 
 ### 3. Sistemin Başlatılması
-Ortam değişkenleri ayarlandıktan sonra ana orkestratör dosyasını çalıştırın:
+Windows kullanıcıları doğrudan proje dizinindeki **`start_bot.bat`** dosyasına çift tıklayarak sistemi tam kapasite ayağa kaldırabilir. Bu dosya, arka planda ana bot döngüsünü başlatırken, eşzamanlı olarak tarayıcınızda Streamlit Komuta Merkezi'ni açacaktır.
+
+Manuel başlatmak için:
 ```bash
 python run_bot.py
 ```
-Bu komut gerekli klasörleri oluşturur (veri, log vb.), SQLite veritabanı tablolarını senkronize eder, asenkron `main_scheduler` (saat başı veri güncelleme, piyasa saatlerinde pozisyon kontrolü) ve Telegram Bot `polling` mekanizmasını aynı anda başlatır.
-
-Sistem başarılı bir şekilde ayağa kalktığında Telegram üzerinden bir başlangıç onayı ("🚀 BİST Algoritmik Sinyal Motoru başlatıldı.") alacaksınız.
-
-## Telegram Bot Komutları
-
-Yetkili kullanıcı (`CHAT_ID`), Telegram üzerinden aşağıdaki komutlarla sisteme erişebilir:
-
-*   `/start`: Botu uyandırır ve kullanılabilecek temel komutları listeler.
-*   `/status`: Sistemin mevcut sağlığını, piyasa rejimini ve sanal cüzdan bakiyesini gösterir.
-*   `/report`: Mevcut açık pozisyonlarınızı, giriş fiyatlarınızı, yönlerini ve lot miktarlarını özetler.
-*   `/analyze <SEMBOL>`: Belirtilen sembol (örn: `/analyze THYAO`) için anlık teknik analiz özetini talep eder.
+Ayrıca, başka bir terminal açarak Dashboard'u da manuel çalıştırabilirsiniz:
+```bash
+streamlit run dashboard.py
+```
 
 ---
 
-> **Not:** Bu proje modüler bir yapıda 25 farklı aşamada (faz) inşa edilecek şekilde tasarlanmıştır. Sistemi genişletirken veya yeni stratejiler eklerken bu dokümandaki katı kurallara uyulması zorunludur.
+## 📱 Telegram Komuta Merkezi Kullanımı
+
+Sistem sadece pasif bir sinyal göndericisi değildir. Telegram üzerinden botunuza aşağıdaki komutları göndererek otonom sisteme yön verebilirsiniz:
+
+| Komut | Açıklama |
+|---|---|
+| `/start` | Sistemin karşılama mesajı ve yetkili olduğunuzun doğrulanması. |
+| `/durum` | Sistemin anlık Market Rejimini (Boğa/Ayı), çalışma süresini (Uptime) ve tarama modunu (Aktif/Uyku) özetler. |
+| `/rapor` | Sanal (Paper Trading) cüzdan bakiyesini, açık hisse oranını ve gerçekleşmiş PnL (Kâr/Zarar) toplamını sunar. |
+| `/durdur` | **(Kill Switch)** Panik anlarında (Örn: ani bir Flash Crash) sinyal aramayı ve işlem girmeyi acil olarak durdurur. |
+| `/baslat` | Kill Switch ile uyku moduna alınmış (Paused) sistemi tekrar aktif tarama moduna geçirir. |
+
+---
+
+## 🛡️ Kurumsal Uyum ve Denetim (Compliance & Audit Trail)
+
+Bu mimari; amatör CSV loglamalarından uzak, `data/db_manager.py` üzerinden SQLite ilişkisel veritabanına ACID prensipleriyle (Atomicity, Consistency, Isolation, Durability) bağlıdır. Sistemdeki her sinyal kararı, ATR değerleri, Kelly fraksiyonu, Makro durumlar ve Makine Öğrenimi (ML) onayı `trade_journal` tablosuna zaman damgalı olarak işlenir.
+
+Eğer sunucu veya bilgisayar aniden kapanırsa (Elektrik kesintisi vb.), `State Recovery` modülü bir sonraki açılışta işlemleri doğrudan veritabanından geri yükler ve bir işlem "Çevrimdışıyken Stop-Loss yemişse" saniyesinde kritik uyarı atar.
+
+---
+
+## ⚠️ Yasal Uyarı (Disclaimer)
+
+**RİSK BİLDİRİMİ:** Bu yazılım tamamen araştırma, eğitim ve simülasyon amacıyla kodlanmıştır. **Hiçbir şekilde yatırım danışmanlığı veya al-sat tavsiyesi içermez.** Borsa İstanbul (BİST) gibi yüksek volatilite barındıran piyasalardaki mikro yapı riskleri (Devre Kesiciler, Tavan/Taban serileri, anlık likidite kuruması vb.) yazılım tarafından simüle edilmeye çalışılsa da, gerçek dünya sonuçlarıyla farklılık gösterebilir. Sanal ve gerçek portföy işlemlerinizden doğacak kâr ve zararlar **tamamen yatırımcının kendi sorumluluğundadır.**
+
+*Yazılımın üretmiş olduğu Kelly Kriteri hesaplamaları, Z-Skorları ve Makine Öğrenimi tahminleri bir yatırım garantisi (holy grail) değil, istatistiksel birer varsayımdan ibarettir.*

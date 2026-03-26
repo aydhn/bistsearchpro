@@ -1,100 +1,41 @@
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 from core.risk_manager import RiskManager
 
 class TestRiskManager(unittest.TestCase):
-    def test_calculate_position_size_invalid_stop_loss(self):
-        # Case where stop_loss >= entry_price (for LONG only)
-        # current_balance=10000, entry_price=100, stop_loss=105, take_profit=120
-        with self.assertLogs('core.risk_manager', level='WARNING') as cm:
-            result = RiskManager.calculate_position_size(10000, 100, 105, 120)
-            self.assertEqual(result, 0)
-            self.assertTrue(any("Stop-Loss seviyesi giriş fiyatından büyük veya eşit olamaz" in output for output in cm.output))
 
-    def test_calculate_position_size_invalid_inputs(self):
-        # Invalid current_balance (<= 0)
-        with self.assertLogs('core.risk_manager', level='ERROR') as cm:
-            result = RiskManager.calculate_position_size(0, 100, 95, 110)
-            self.assertEqual(result, 0)
-            self.assertTrue(any("Geçersiz bakiye veya giriş fiyatı" in output for output in cm.output))
+    def setUp(self):
+        self.rm = RiskManager()
 
-        # Invalid entry_price (<= 0)
-        with self.assertLogs('core.risk_manager', level='ERROR') as cm:
-            result = RiskManager.calculate_position_size(10000, 0, 95, 110)
-            self.assertEqual(result, 0)
-            self.assertTrue(any("Geçersiz bakiye veya giriş fiyatı" in output for output in cm.output))
+    def test_calculate_trade_parameters_happy(self):
+        valid, sl, tp = self.rm.calculate_trade_parameters(100.0, 2.0, "LONG")
+        self.assertTrue(valid)
+        self.assertEqual(sl, 97.0)
+        self.assertEqual(tp, 106.0)
 
-    def test_calculate_position_size_happy_path(self):
-        # Valid inputs
-        # balance=10000, entry=100, sl=95, tp=110
-        # risk_per_share = 100 - 95 = 5
-        # reward_per_share = 110 - 100 = 10
-        # risk_reward_ratio = 10 / 5 = 2.0
-        # max_risk_amount = 10000 * 0.02 = 200
-        # max_lot_fixed = 200 / 5 = 40
-        # Kelly: half_kelly = (0.55 - (0.45 / 2.0)) / 2 = (0.55 - 0.225) / 2 = 0.325 / 2 = 0.1625
-        # lot_kelly = floor(10000 * 0.1625 / 100) = floor(16.25) = 16
-        # final_lot = min(40, 16) = 16
-        # affordable = floor(10000 / 100) = 100
-        # final_lot = min(16, 100) = 16
+    def test_calculate_trade_parameters_invalid(self):
+        valid, sl, tp = self.rm.calculate_trade_parameters(100.0, 0.0, "LONG")
+        self.assertFalse(valid)
 
-        result = RiskManager.calculate_position_size(10000, 100, 95, 110)
-        self.assertEqual(result, 16)
+    def test_evaluate_dynamic_exit_breakeven(self):
+        # current 103, entry 100, current_sl 97, current_tp 106, atr 2 -> Breakeven 100 + 1.0*2 = 102
+        res = self.rm.evaluate_dynamic_exit("THYAO", 102.0, 100.0, 97.0, 106.0, "", 2.0, 10, "LONG")
+        self.assertEqual(res['action'], 'UPDATE_SL')
+        self.assertEqual(res['new_sl'], 100.0)
 
+    def test_evaluate_dynamic_exit_trailing(self):
+        # current 110, entry 100, current_sl 100, atr 2 -> tp1 = 100 + 2.0*2 = 104
+        # current 110 > 104 -> partial close
+        res = self.rm.evaluate_dynamic_exit("THYAO", 110.0, 100.0, 100.0, 150.0, "", 2.0, 10, "LONG")
+        self.assertEqual(res['action'], 'PARTIAL_CLOSE')
+        self.assertEqual(res['new_sl'], 107.0) # 110 - 1.5*2 = 107
 
-    def test_calculate_position_size_kelly_negative(self):
-        # win_rate=0.55, entry=100, sl=90, tp=105 -> RRR = 0.5
-        # kelly = 0.55 - (0.45 / 0.5) = 0.55 - 0.9 = -0.35
-        with self.assertLogs('core.risk_manager', level='INFO') as cm:
-            result = RiskManager.calculate_position_size(10000, 100, 90, 105)
-            self.assertEqual(result, 0)
-            self.assertTrue(any("Kelly Kriteri negatif veya sıfır döndü" in output for output in cm.output))
-
-    def test_calculate_position_size_fixed_risk_dominates(self):
-        # balance=10000, entry=10, sl=9, tp=20 -> risk=1, reward=10, RRR=10
-        # max_lot_fixed = floor(10000 * 0.02 / 1) = 200
-        # half_kelly = (0.55 - 0.45/10) / 2 = 0.2525
-        # lot_kelly = floor(10000 * 0.2525 / 10) = 252
-        # final_lot = min(200, 252) = 200
-        result = RiskManager.calculate_position_size(10000, 10, 9, 20)
-        self.assertEqual(result, 200)
-
-    def test_calculate_position_size_kelly_dominates(self):
-        # balance=10000, entry=10, sl=9, tp=11.5 -> risk=1, reward=1.5, RRR=1.5
-        # max_lot_fixed = floor(10000 * 0.02 / 1) = 200
-        # half_kelly = (0.55 - 0.45/1.5) / 2 = (0.55 - 0.3) / 2 = 0.125
-        # lot_kelly = floor(10000 * 0.125 / 10) = 125
-        # final_lot = min(200, 125) = 125
-        result = RiskManager.calculate_position_size(10000, 10, 9, 11.5)
-        self.assertEqual(result, 125)
-
-    @patch('core.risk_manager.config')
-    def test_calculate_position_size_affordable_dominates(self, mock_config):
-        mock_config.MAX_RISK_PER_TRADE = 1.0 # 100% risk per trade allowed
-        # balance=10000, entry=10, sl=9, tp=20 -> risk=1, reward=10, RRR=10
-        # max_lot_fixed = floor(10000 * 1.0 / 1) = 10000
-        # historical_win_rate = 3.0 (unrealistic, but for testing the cap)
-        # kelly = 3.0 - ((1 - 3.0) / 10) = 3.0 - (-2.0 / 10) = 3.2
-        # half_kelly = 1.6
-        # lot_kelly = floor(10000 * 1.6 / 10) = 1600
-        # max_affordable_lot = floor(10000 / 10) = 1000
-        # final_lot = min(10000, 1600, 1000) = 1000
-        result = RiskManager.calculate_position_size(10000, 10, 9, 20, historical_win_rate=3.0)
-        self.assertEqual(result, 1000)
-
-    def test_calculate_kelly_fraction_edge_cases(self):
-        # Edge case: risk_reward_ratio is 0
-        self.assertEqual(RiskManager.calculate_kelly_fraction(win_rate=0.55, risk_reward_ratio=0.0), 0.0)
-
-        # Edge case: risk_reward_ratio is negative
-        self.assertEqual(RiskManager.calculate_kelly_fraction(win_rate=0.55, risk_reward_ratio=-1.0), 0.0)
-
-        # Edge case: resulting half_kelly_pct is negative (e.g., win_rate is low, RRR is low)
-        self.assertEqual(RiskManager.calculate_kelly_fraction(win_rate=0.40, risk_reward_ratio=1.0), 0.0)
-
-    def test_calculate_kelly_fraction_happy_path(self):
-        # Valid path
-        self.assertAlmostEqual(RiskManager.calculate_kelly_fraction(win_rate=0.55, risk_reward_ratio=2.0), 0.1625, places=4)
+    def test_calculate_position_size(self):
+        # balance 10000, entry 100, sl 95 (risk per share = 5)
+        # max_risk = 10000 * 0.02 = 200
+        # shares = 200 / 5 = 40
+        result = self.rm.calculate_position_size(10000.0, 100.0, 95.0)
+        self.assertEqual(result, 40)
 
 if __name__ == '__main__':
     unittest.main()
