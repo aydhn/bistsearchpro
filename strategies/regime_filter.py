@@ -4,68 +4,59 @@ logger = logging.getLogger(__name__)
 
 class RegimeFilter:
     """
-    Yatay (Range) piyasalarda testere (whipsaw) hareketlerinden kaçınmak için
-    tasarlanmış ADX ve EMA200 tabanlı rejim filtresi.
+    BIST 100 endeksinin (XU100.IS) genel sağlığını ölçecek bağımsız sınıf.
+    Makro Trend Kuralı: XU100, 200 günlük Basit Hareketli Ortalamanın (SMA 200) altındaysa
+    piyasa "Ayı (Bear)", üstündeyse "Boğa (Bull)" rejimi olarak etiketlenir.
+
+    Eğer piyasa Ayı rejimindeyse, sistemdeki Long (AL) sinyalleri reddedilmeli
+    veya Kelly lot hesaplayıcısındaki risk oranı yarı yarıya (Half-Risk) düşürülmelidir.
     """
 
     @staticmethod
-    def determine_regime(df_ind):
+    def determine_regime(df_xu100):
         """
-        Gelen DataFrame üzerinden son barlara bakarak güncel piyasa rejimini tayin eder.
-
-        Kural Seti:
-        Eğer ADX > 25 ise sistem REGIME_TREND durumuna geçer.
-        Eğer ADX < 25 ise sistem REGIME_RANGE (Yatay) durumuna geçer.
-
-        Yön Tayini:
-        Mevcut kapanış fiyatı EMA(200)'ün üzerindeyse yönü BULL,
-        altındaysa BEAR olarak etiketler.
+        BIST 100 günlük verisi (df_xu100) üzerinden piyasa rejimini tayin eder.
+        Gelen veri seti XU100.IS'in GÜNLÜK (1D) mumlarını içermelidir.
         """
-        if df_ind is None or df_ind.empty:
-            logger.warning("Empty DataFrame provided to regime filter.")
+        if df_xu100 is None or df_xu100.empty:
+            logger.warning("Regime filter için boş DataFrame sağlandı.")
             return None
 
-        # pandas-ta calculates ADX, but we might not have added it in Faz 9 yet.
-        # Let's add it dynamically if missing or just require it.
-        if 'ADX_14' not in df_ind.columns:
-            # We must calculate ADX if it's not present.
-            # Doing it inline to keep it vectorized and simple.
-            df_ind.ta.adx(length=14, append=True)
-
         try:
-            # Get the latest row (most recent bar)
-            latest = df_ind.iloc[-1]
+            # Eğer SMA_200 hesaplanmamışsa hesapla
+            if 'sma_200' not in df_xu100.columns and 'SMA_200' not in df_xu100.columns:
+                df_xu100.ta.sma(length=200, append=True)
 
-            # 1. Rejim Tespiti (Trend veya Yatay)
-            adx_val = latest.get('ADX_14', 0)
+            # Sütun ismini standartlaştır (pandas_ta varsayılanı SMA_200 olabilir)
+            sma_col = 'sma_200' if 'sma_200' in df_xu100.columns else 'SMA_200'
 
-            if adx_val > 25:
-                regime = "REGIME_TREND"
-            else:
-                regime = "REGIME_RANGE"
+            # Yeterli veri yoksa nötr dön
+            if df_xu100[sma_col].isna().iloc[-1]:
+                logger.warning("XU100 verisi 200 günden az, rejim tayin edilemedi.")
+                return {"regime": "NEUTRAL", "sma200": 0.0, "close": df_xu100['close'].iloc[-1]}
 
-            # 2. Yön Tespiti (BULL veya BEAR)
+            # Son mum verilerini al
+            latest = df_xu100.iloc[-1]
             close_price = latest['close']
+            sma200_val = latest[sma_col]
 
-            # Using EMA200 from our pipeline
-            ema200_val = latest.get('EMA_200') or latest.get('ema_200', 0)
-
-            if close_price > ema200_val:
-                direction = "BULL"
+            # Rejim Tespiti
+            if close_price > sma200_val:
+                regime = "BULL"
             else:
-                direction = "BEAR"
+                regime = "BEAR"
 
-            logger.debug(f"Piyasa Rejimi Tayini: {regime}, Yön: {direction} (ADX={adx_val:.2f}, Fiyat={close_price}, EMA200={ema200_val:.2f})")
+            logger.info(f"XU100 Piyasa Rejimi: {regime} (Fiyat={close_price:.2f}, SMA200={sma200_val:.2f})")
 
             return {
                 "regime": regime,
-                "direction": direction,
-                "adx_value": adx_val
+                "sma200": sma200_val,
+                "close": close_price
             }
 
         except KeyError as e:
-            logger.error(f"Missing column required for regime filter: {e}")
+            logger.error(f"Regime filter için gerekli sütun bulunamadı: {e}")
             return None
         except Exception as e:
-            logger.error(f"Regime filter error: {e}")
+            logger.error(f"Regime filter hesaplama hatası: {e}")
             return None

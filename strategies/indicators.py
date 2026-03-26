@@ -1,72 +1,81 @@
-import pandas_ta  # noqa: F401
+import pandas_ta as ta
+import pandas as pd
 import logging
 
 logger = logging.getLogger(__name__)
 
-class IndicatorPipeline:
+class TechnicalIndicators:
     """
-    Vektörel (döngüsüz) teknik indikatör hesaplayıcı.
-    pandas-ta kullanarak devasa veri setlerinde bile milisaniyelerde sonuç üretir.
+    Pandas-ta kütüphanesini kullanarak vektörel ve optimize indikatör hesaplamaları yapar.
+    Sıfır bütçe ve donanım dostu (döngüsüz) prensiplere uyar.
+    Memory leak önlemek için DataFrame manipülasyonları inplace veya kontrollü yapılır.
     """
 
     @staticmethod
-    def add_indicators(df):
+    def calculate_all(df: pd.DataFrame, limit: int = None) -> pd.DataFrame:
         """
-        Gelen OHLCV DataFrame'ine tek bir fonksiyon çağrısıyla
-        Trend, Momentum ve Volatilite indikatörlerini ekler.
+        Gelen ham DataFrame'in son N mumu (limit) üzerinde tüm teknik indikatörleri
+        hesaplar ve aynı DataFrame'e ekler.
         """
-        if df.empty or len(df) < 200:
-             logger.warning("Yetersiz veri. İndikatör hesaplanamıyor (en az 200 bar gerekli).")
-             return None
+        if df is None or df.empty:
+            logger.warning("calculate_all için boş DataFrame sağlandı.")
+            return df
 
-        df_ind = df.copy()
+        # Eğer limit belirtilmişse, gereksiz hesaplamaları önlemek için df'i kes
+        if limit and len(df) > limit:
+            df = df.tail(limit).copy()
 
+        # Pandas-ta Strategy yapısı ile toplu vektörel hesaplama
         try:
-            # 1. Trend İndikatörleri (EMA: Üstel Hareketli Ortalama)
-            df_ind.ta.ema(length=20, append=True)
-            df_ind.ta.ema(length=50, append=True)
-            df_ind.ta.ema(length=200, append=True)
+            # 1. Trend ve İvme: EMA (20, 50) ve RSI (14)
+            # 2. Volatilite: ATR (14) - Dinamik stop-loss için
+            # 3. İstatistiksel Sapma: Bollinger Bantları (20, 2)
 
-            # 2. Momentum İndikatörleri (RSI ve MACD)
-            df_ind.ta.rsi(length=14, append=True)
+            # Sütun isimlendirme çakışmalarını önlemek için prefix vs kullanılabilir
+            # veya pandas-ta'nın standart isimlendirmeleri kabul edilebilir.
 
-            # MACD parametreleri: fast=12, slow=26, signal=9. df.ta.macd()
-            # pandas-ta standart kolon isimlendirmesi: MACD_12_26_9, MACDh_12_26_9, MACDs_12_26_9
-            df_ind.ta.macd(fast=12, slow=26, signal=9, append=True)
+            # Vektörel hesaplamalar
+            df.ta.ema(length=20, append=True)
+            df.ta.ema(length=50, append=True)
+            df.ta.rsi(length=14, append=True)
+            df.ta.atr(length=14, append=True)
+            df.ta.bbands(length=20, std=2, append=True)
 
-            # 3. Volatilite İndikatörleri (ATR ve Bollinger Bantları)
-            df_ind.ta.atr(length=14, append=True)
+            # ADX (Trend Following stratejisi için)
+            df.ta.adx(length=14, append=True)
 
-            # Bollinger Bantları: BB_LOWER, BB_MID, BB_UPPER (standart sapma: 2, periyot: 20)
-            df_ind.ta.bbands(length=20, std=2, append=True)
+            # MACD (Trend Following stratejisi için)
+            df.ta.macd(fast=12, slow=26, signal=9, append=True)
 
-            # Başlangıç barlarındaki hesaplanamayan NaN değerlerini kes (trim)
-            df_ind.dropna(inplace=True)
+            # Donchian Channels (Volatility Breakout stratejisi için)
+            df.ta.donchian(lower_length=20, upper_length=20, append=True)
 
-            # Rename columns for easier access (optional but recommended for consistency)
-            # Default pandas-ta names might include parameters, so we can map them
-
+            # Sütun isimlerini kolay kullanım için standartlaştır
+            # pandas_ta sütun isimleri örn: 'EMA_20', 'RSI_14', 'ATRr_14', 'BBL_20_2.0', 'BBM_20_2.0', 'BBU_20_2.0'
             rename_map = {
                 'EMA_20': 'ema_20',
                 'EMA_50': 'ema_50',
-                'EMA_200': 'ema_200',
-                'RSI_14': 'rsi_14',
-                'MACD_12_26_9': 'macd',
-                'MACDh_12_26_9': 'macd_hist',
-                'MACDs_12_26_9': 'macd_signal',
-                'ATRr_14': 'atr_14',
+                'RSI_14': 'rsi',
+                'ATRr_14': 'atr',
                 'BBL_20_2.0': 'bb_lower',
                 'BBM_20_2.0': 'bb_mid',
                 'BBU_20_2.0': 'bb_upper',
-                'BBB_20_2.0': 'bb_bandwidth',
-                'BBP_20_2.0': 'bb_percent'
+                'ADX_14': 'adx',
+                'MACD_12_26_9': 'macd',
+                'MACDs_12_26_9': 'macd_signal',
+                'DCL_20_20': 'donchian_lower',
+                'DCU_20_20': 'donchian_upper'
             }
 
-            df_ind.rename(columns=rename_map, inplace=True, errors='ignore')
+            # Yalnızca var olan sütunları yeniden adlandır (hata almamak için)
+            actual_rename = {k: v for k, v in rename_map.items() if k in df.columns}
+            df.rename(columns=actual_rename, inplace=True)
 
-            logger.debug(f"Indicators added successfully. Resulting shape: {df_ind.shape}")
-            return df_ind
+            # Na olan ilk satırları temizle
+            df.dropna(inplace=True)
+
+            return df
 
         except Exception as e:
-            logger.error(f"Error calculating indicators: {e}")
-            return None
+            logger.error(f"İndikatör hesaplamasında hata: {str(e)}")
+            return df

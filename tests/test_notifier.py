@@ -18,9 +18,9 @@ sys.path.insert(0, current_dir)
 
 import config.settings
 
-spec = importlib.util.spec_from_file_location("telegram.notifier", os.path.join(current_dir, "telegram", "notifier.py"))
+spec = importlib.util.spec_from_file_location("telegram_bot.notifier", os.path.join(current_dir, "telegram_bot", "notifier.py"))
 telegram_notifier = importlib.util.module_from_spec(spec)
-sys.modules["telegram.notifier"] = telegram_notifier
+sys.modules["telegram_bot.notifier"] = telegram_notifier
 spec.loader.exec_module(telegram_notifier)
 
 TelegramNotifier = telegram_notifier.TelegramNotifier
@@ -107,7 +107,7 @@ class TestTelegramNotifier(unittest.IsolatedAsyncioTestCase):
 
         notifier = TelegramNotifier()
 
-        with self.assertLogs('telegram.notifier', level='ERROR') as cm:
+        with self.assertLogs('telegram_bot.notifier', level='ERROR') as cm:
             await notifier.send_signal("THYAO", "BUY", 100.5, 95.0, 110.0, 85)
             self.assertTrue(any("Failed to send signal message: API Error" in output for output in cm.output))
 
@@ -160,7 +160,7 @@ class TestTelegramNotifier(unittest.IsolatedAsyncioTestCase):
 
         notifier = TelegramNotifier()
 
-        with self.assertLogs('telegram.notifier', level='ERROR') as cm:
+        with self.assertLogs('telegram_bot.notifier', level='ERROR') as cm:
             await notifier.send_system_alert("Test alert")
             self.assertTrue(any("Failed to send system alert: Network Error" in output for output in cm.output))
 
@@ -183,7 +183,7 @@ class TestTelegramNotifier(unittest.IsolatedAsyncioTestCase):
         mock_update_unauth = MagicMock()
         mock_update_unauth.effective_user.id = 99999
 
-        with self.assertLogs('telegram.notifier', level='WARNING') as cm:
+        with self.assertLogs('telegram_bot.notifier', level='WARNING') as cm:
             result_unauth = await notifier.filter_unauthorized_user(mock_update_unauth)
             self.assertFalse(result_unauth)
             self.assertTrue(any("Unauthorized access attempt from user ID: 99999" in output for output in cm.output))
