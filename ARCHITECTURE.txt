@@ -1,0 +1,68 @@
+.
+├── ARCHITECTURE.txt
+├── README.md
+├── backtest
+│   ├── advanced_backtester.py
+│   ├── engine.py
+│   ├── execution_simulator.py
+│   └── monte_carlo.py
+├── config
+│   └── settings.py
+├── core
+│   ├── alpha_orchestrator.py
+│   ├── brain.py
+│   ├── circuit_breaker.py
+│   ├── correlation_engine.py
+│   ├── data_fetcher_tv.py
+│   ├── data_fetcher_yf.py
+│   ├── data_router.py
+│   ├── edge_case_handler.py
+│   ├── error_manager.py
+│   ├── fundamental_scraper.py
+│   ├── journal_learner.py
+│   ├── logger.py
+│   ├── macro_data.py
+│   ├── memory_manager.py
+│   ├── ml_predictor.py
+│   ├── mtf_engine.py
+│   ├── paper_trader.py
+│   ├── parameter_optimizer.py
+│   ├── portfolio_allocator.py
+│   ├── position_sizer.py
+│   ├── risk_manager.py
+│   ├── state_manager.py
+│   ├── state_recovery.py
+│   ├── trade_journal.py
+│   └── universe.py
+├── dashboard.py
+├── data
+│   └── db_manager.py
+├── main_scheduler.py
+├── requirements.txt
+├── run_bot.py
+├── start_bot.bat
+├── strategies
+│   ├── cointegration_engine.py
+│   ├── indicators.py
+│   ├── macro_filter.py
+│   ├── pairs_strategy.py
+│   ├── regime_filter.py
+│   ├── sentiment.py
+│   ├── signal_reversion.py
+│   ├── signal_trend.py
+│   ├── stat_arb.py
+│   ├── strategy_factory.py
+│   └── wfa_optimizer.py
+├── telegram_bot
+│   ├── __init__.py
+│   ├── bot_commands.py
+│   └── notifier.py
+└── tests
+    ├── test_brain.py
+    ├── test_notifier.py
+    ├── test_risk_manager.py
+    ├── test_state_manager.py
+    ├── test_telegram_notifier.py
+    └── test_universe.py
+
+8 directories, 58 files
