@@ -1,0 +1,33 @@
+{
+    "api_keys": {
+        "TELEGRAM_TOKEN": "BURAYA_TOKEN_GIRIN",
+        "ADMIN_CHAT_ID": "BURAYA_ID_GIRIN"
+    },
+    "trading_parameters": {
+        "INITIAL_BALANCE": 100000.0,
+        "MAX_RISK_PER_TRADE_PCT": 2.0,
+        "MAX_OPEN_POSITIONS": 10,
+        "COMMISSION_RATE_PCT": 0.1,
+        "SLIPPAGE_RATE_PCT": 0.1
+    },
+    "strategy_settings": {
+        "EMA_SHORT": 50,
+        "EMA_LONG": 200,
+        "RSI_OVERSOLD": 30,
+        "RSI_PERIOD": 14,
+        "ATR_MULTIPLIER_SL": 1.5,
+        "ATR_MULTIPLIER_TP": 3.0,
+        "ATR_PERIOD": 14,
+        "VOLATILITY_LOOKBACK": 50,
+        "VOLATILITY_SHOCK_MULTIPLIER": 3.0
+    },
+    "system_settings": {
+        "POLLING_INTERVAL_MINUTES": 15,
+        "LOG_LEVEL": "INFO",
+        "MARKET_OPEN_HOUR": 10,
+        "MARKET_OPEN_MINUTE": 0,
+        "MARKET_CLOSE_HOUR": 18,
+        "MARKET_CLOSE_MINUTE": 10,
+        "MAX_CPU_CORES_PCT": 80
+    }
+}
