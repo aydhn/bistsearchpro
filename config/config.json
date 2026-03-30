@@ -1,0 +1,28 @@
+{
+    "api_keys": {
+        "TELEGRAM_TOKEN": "YOUR_TELEGRAM_BOT_TOKEN_HERE",
+        "ADMIN_CHAT_ID": "YOUR_ADMIN_CHAT_ID_HERE"
+    },
+    "trading_parameters": {
+        "INITIAL_VIRTUAL_BALANCE": 100000,
+        "MAX_RISK_PER_TRADE_PERCENT": 2.0,
+        "MAX_OPEN_POSITIONS": 8,
+        "MAX_POSITIONS_PER_SECTOR": 2,
+        "COMMISSION_RATE": 0.001,
+        "SLIPPAGE_RATE": 0.001
+    },
+    "strategy_settings": {
+        "EMA_SHORT": 50,
+        "EMA_LONG": 200,
+        "RSI_OVERSOLD": 30,
+        "RSI_OVERBOUGHT": 70,
+        "ATR_MULTIPLIER_SL": 1.5,
+        "ATR_MULTIPLIER_TP": 3.0,
+        "VOLUME_SMA_PERIOD": 20
+    },
+    "system_settings": {
+        "POLLING_INTERVAL_MINUTES": 15,
+        "LOG_LEVEL": "INFO",
+        "PENDING_SIGNAL_TIMEOUT_HOURS": 2
+    }
+}
